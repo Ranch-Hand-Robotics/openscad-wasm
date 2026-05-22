@@ -9,3 +9,10 @@ res
 *.make
 .oci.*
 .DS_Store
+
+# Build/debug artifacts
+build-output*.txt
+deno-included-*.txt
+included-test-*.txt
+*.log
+boost-1.87.0-b2-nodocs.tar.xz

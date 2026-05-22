@@ -13,6 +13,7 @@ ENV CMAKE_C_FLAGS="${EMSCRIPTEN_FLAGS}"
 ENV CMAKE_CXX_FLAGS="${EMSCRIPTEN_FLAGS}"
 ENV CMAKE_EXE_LINKER_FLAGS="${EMSCRIPTEN_FLAGS}"
 
+WORKDIR /home/ubuntu/openscad
 RUN git clone --recurse-submodules https://github.com/ranchhandrobotics/openscad.git --depth 1 --branch feature/color_export --single-branch .
 RUN emcmake cmake -B ../build . \
         -DBoost_USE_STATIC_RUNTIME=ON \

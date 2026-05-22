@@ -1,4 +1,4 @@
-import { join, dirname } from "https://deno.land/std/path/mod.ts";
+import { join, posix } from "https://deno.land/std/path/mod.ts";
 import { OpenSCAD, FS } from "../build/openscad.js";
 
 export async function loadTestFiles(instance: OpenSCAD, directory: string) {
@@ -8,16 +8,20 @@ export async function loadTestFiles(instance: OpenSCAD, directory: string) {
 
   for(const [from, to] of fileMap){
     const content = await Deno.readFile(from);
-    ensureDirExists(instance.FS, dirname(to));
+    ensureDirExists(instance.FS, posix.dirname(to));
     instance.FS.writeFile(to, content);
   }
 }
 
 function ensureDirExists(fs: FS, path: string){
+  if(path === '' || path === '.' || path === '/' || path === '\\'){
+    return;
+  }
+
   try{
     fs.stat(path);
   }catch(e: unknown){
-    ensureDirExists(fs, dirname(path));
+    ensureDirExists(fs, posix.dirname(path));
     fs.mkdir(path);
   }
 }
@@ -28,7 +32,8 @@ async function readFiles(map: Map<string, string>, root: string, location: strin
     if(testFile.isDirectory){
       await readFiles(map, root, join(location, testFile.name));
     }else{
-      map.set(join(cwd, testFile.name), join('/', location, testFile.name))
+      const normalizedLocation = location.replaceAll("\\", "/");
+      map.set(join(cwd, testFile.name), posix.join("/", normalizedLocation, testFile.name));
     }
   }
 }

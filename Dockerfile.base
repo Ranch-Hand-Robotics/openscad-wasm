@@ -20,6 +20,7 @@ RUN --mount=type=cache,target=/var/cache/apt \
     --mount=type=cache,target=/var/lib/apt \
     apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        autoconf-archive \
         automake \
         autopoint \
         bison \
@@ -81,7 +82,8 @@ WORKDIR /home/ubuntu
 
 FROM builder AS boost
 COPY boost .
-RUN ./bootstrap.sh && \
+RUN chmod +x bootstrap.sh && \
+    ./bootstrap.sh && \
     ./b2 \
       --disable-icu \
       --prefix=/emsdk/upstream/emscripten/cache/sysroot \
@@ -102,6 +104,8 @@ RUN ./bootstrap.sh && \
 FROM builder AS libexpat
 COPY libexpat .
 RUN cd expat && \
+    sed -i 's/\r$//' buildconf.sh && \
+    chmod +x buildconf.sh && \
     ./buildconf.sh && \
     emconfigure ./configure \
         --without-docbook \
@@ -115,7 +119,8 @@ RUN cd expat && \
 
 FROM builder AS zlib
 COPY zlib .
-RUN emcmake cmake \
+RUN sed -i '/add_subdirectory(test)/d' CMakeLists.txt && \
+    emcmake cmake \
         -DINSTALL_PKGCONFIG_DIR="/emsdk/upstream/emscripten/cache/sysroot/lib/pkgconfig/" \
         -B ../build && \
     cmake --build ../build && \
@@ -133,9 +138,11 @@ RUN emcmake cmake \
 
 FROM builder AS libffi
 COPY libffi .
-RUN ./autogen.sh && \
+RUN find . -type f \( -name "*.sh" -o -name "configure*" -o -name "*.ac" -o -name "*.am" -o -name "*.m4" -o -name "libtool-*" \) -exec sed -i 's/\r$//' {} + && \
+    chmod +x autogen.sh && \
+    sh ./autogen.sh && \
     emconfigure ./configure \
-      --host wasm32-unknown-linux \
+      --host wasm32-emscripten \
       --prefix=/emsdk/upstream/emscripten/cache/sysroot \
       --enable-static \
       --disable-shared \
@@ -153,7 +160,8 @@ COPY --from=zlib /emsdk/upstream/emscripten/cache/sysroot /emsdk/upstream/emscri
 COPY --from=libffi /emsdk/upstream/emscripten/cache/sysroot /emsdk/upstream/emscripten/cache/sysroot
 COPY glib .
 COPY emscripten-crossfile.meson .
-RUN meson \
+RUN find . -type f \( -name "*.sh" -o -name "*.py" -o -name "*.pl" -o -name "meson*" -o -name "*.ini" -o -name "*.in" -o -name "*.am" -o -name "*.ac" -o -name "configure*" \) -exec sed -i 's/\r$//' {} + && \
+    meson \
       setup \
       ../build \
       --prefix=/emsdk/upstream/emscripten/cache/sysroot \
@@ -200,7 +208,12 @@ COPY --from=libxml2 /emsdk/upstream/emscripten/cache/sysroot /emsdk/upstream/ems
 COPY fontconfig .
 ENV FREETYPE_CFLAGS="-I/emsdk/upstream/emscripten/cache/sysroot/include/freetype2"
 ENV FREETYPE_LIBS="-lfreetype -lz"
-RUN emconfigure ./autogen.sh \
+RUN find . -type f \( -name "*.sh" -o -name "configure*" -o -name "*.ac" -o -name "*.am" -o -name "*.m4" -o -name "*.in" -o -name "makealias" \) -exec sed -i 's/\r$//' {} + && \
+    sed -i '1s/^\xEF\xBB\xBF//' autogen.sh && \
+    sed -i 's/^SUBDIRS=.*/SUBDIRS=fontconfig fc-case fc-lang fc-const src/' Makefile.am && \
+    sed -i '/^ACLOCAL_AMFLAGS[[:space:]]*=/d' Makefile.am && \
+    chmod +x autogen.sh && \
+    emconfigure sh ./autogen.sh \
         --host none \
         --disable-docs \
         --disable-shared \

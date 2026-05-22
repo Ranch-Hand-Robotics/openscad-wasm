@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenSCAD WASM Basic Test</title>
+  <style>
+    body { font-family: monospace; margin: 20px; background: #1e1e1e; color: #e0e0e0; }
+    #log { background: #2d2d2d; border: 1px solid #444; padding: 10px; border-radius: 4px; max-height: 600px; overflow-y: auto; margin-bottom: 20px; }
+    .log-entry { margin: 5px 0; white-space: pre-wrap; word-break: break-all; }
+    .success { color: #4ec9b0; } .error { color: #f48771; } .info { color: #9cdcfe; }
+    button { padding: 10px 20px; background: #0e639c; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #1177bb; }
+  </style>
+</head>
+<body>
+  <h1>OpenSCAD WASM Test Suite</h1>
+  <button onclick="testSTL()">Test 1: Generate STL</button>
+  <button onclick="testGLB()">Test 2: Generate GLB</button>
+  <button onclick="testGLBWithColors()">Test 3: GLB with Colors</button>
+  <button onclick="clearLog()">Clear Log</button>
+  <div id="log"></div>
+  
+  <script type="module">
+    import OpenScad from "./openscad.js";
+    import { addFonts } from "./openscad.fonts.js";
+
+    const logElement = document.getElementById('log');
+    let instance = null;
+    
+    function log(message, type = 'info') {
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = message;
+      logElement.appendChild(entry);
+      logElement.scrollTop = logElement.scrollHeight;
+    }
+
+    window.clearLog = () => { logElement.innerHTML = ''; };
+
+    async function initWASM() {
+      if (instance) return;
+      log("[*] Initializing OpenSCAD WASM...", 'info');
+      instance = await OpenScad({ noInitialRun: true });
+      addFonts(instance);
+      log("[✓] WASM loaded", 'success');
+    }
+
+    window.testSTL = async () => {
+      clearLog();
+      try {
+        await initWASM();
+        
+        const scad = `
+color([1, 0, 0])
+cube([10, 10, 10]);
+
+translate([15, 0, 0])
+color([0, 1, 0])
+sphere(r=8);
+`;
+        
+        log("[*] Writing test.scad...", 'info');
+        instance.FS.writeFile("/test.scad", scad);
+        
+        log("[*] Generating STL...", 'info');
+        const code = instance.callMain(["/test.scad", "-o", "/test.stl"]);
+        log(`[*] Exit code: ${code}`, code === 0 ? 'success' : 'error');
+        
+        if (code === 0) {
+          const output = instance.FS.readFile("/test.stl");
+          log(`[✓] STL generated! Size: ${output.length} bytes`, 'success');
+          
+          const blob = new Blob([output]);
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = "test.stl";
+          link.click();
+        }
+      } catch (e) {
+        log(`[!] Error: ${e.message}`, 'error');
+      }
+    };
+
+    window.testGLB = async () => {
+      clearLog();
+      try {
+        await initWASM();
+        
+        const scad = 'cube([10, 10, 10]);';
+        
+        log("[*] Writing test.scad...", 'info');
+        instance.FS.writeFile("/test.scad", scad);
+        
+        log("[*] Generating GLB (no colors)...", 'info');
+        const code = instance.callMain(["/test.scad", "--export-format=glb", "-o", "/test.glb"]);
+        log(`[*] Exit code: ${code}`, code === 0 ? 'success' : 'error');
+        
+        if (code === 0) {
+          const output = instance.FS.readFile("/test.glb");
+          const magic = String.fromCharCode(output[0], output[1], output[2], output[3]);
+          log(`[*] GLB Magic: "${magic}"`, magic === 'glTF' ? 'success' : 'error');
+          log(`[✓] GLB generated! Size: ${output.length} bytes`, 'success');
+          
+          const blob = new Blob([output]);
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = "test.glb";
+          link.click();
+        }
+      } catch (e) {
+        log(`[!] Error: ${e.message}`, 'error');
+      }
+    };
+
+    window.testGLBWithColors = async () => {
+      clearLog();
+      try {
+        await initWASM();
+        
+        const scad = `
+color([1, 0, 0])
+cube([10, 10, 10]);
+
+translate([15, 0, 0])
+color([0, 1, 0], alpha=0.5)
+sphere(r=8);
+
+translate([30, 0, 0])
+color([0, 0, 1], alpha=0.3)
+cylinder(h=20, r=5, center=true);
+`;
+        
+        log("[*] Writing test-colors.scad...", 'info');
+        instance.FS.writeFile("/test.scad", scad);
+        
+        log("[*] Generating GLB with colors & transparency...", 'info');
+        const code = instance.callMain(["/test.scad", "--export-format=glb", "-o", "/test.glb"]);
+        log(`[*] Exit code: ${code}`, code === 0 ? 'success' : 'error');
+        
+        if (code === 0) {
+          const output = instance.FS.readFile("/test.glb");
+          const magic = String.fromCharCode(output[0], output[1], output[2], output[3]);
+          log(`[*] GLB Magic: "${magic}"`, magic === 'glTF' ? 'success' : 'error');
+          log(`[✓] GLB with colors generated! Size: ${output.length} bytes`, 'success');
+          
+          const blob = new Blob([output]);
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = "test-colors.glb";
+          link.click();
+        }
+      } catch (e) {
+        log(`[!] Error: ${e.message}`, 'error');
+      }
+    };
+
+    log("[*] Test page ready. Start with STL test.", 'info');
+  </script>
+</body>
+</html>

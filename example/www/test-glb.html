@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenSCAD GLB Test</title>
+  <style>
+    body {
+      font-family: monospace;
+      margin: 20px;
+      background: #1e1e1e;
+      color: #e0e0e0;
+    }
+    #log {
+      background: #2d2d2d;
+      border: 1px solid #444;
+      padding: 10px;
+      border-radius: 4px;
+      max-height: 400px;
+      overflow-y: auto;
+      margin-bottom: 20px;
+    }
+    .log-entry {
+      margin: 5px 0;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .success { color: #4ec9b0; }
+    .error { color: #f48771; }
+    .info { color: #9cdcfe; }
+    button {
+      padding: 10px 20px;
+      background: #0e639c;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #1177bb;
+    }
+  </style>
+</head>
+<body>
+  <h1>OpenSCAD GLB Export Test</h1>
+  <p>Testing GLB export with colors and transparency support</p>
+  
+  <button onclick="runTest()">Generate GLB with Colors</button>
+  <button onclick="clearLog()">Clear Log</button>
+  
+  <div id="log"></div>
+  
+  <script type="module">
+    import OpenScad from "./openscad.js";
+    import { addFonts } from "./openscad.fonts.js";
+
+    const logElement = document.getElementById('log');
+    
+    function log(message, type = 'info') {
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = message;
+      logElement.appendChild(entry);
+      logElement.scrollTop = logElement.scrollHeight;
+    }
+
+    window.clearLog = () => {
+      logElement.innerHTML = '';
+    };
+
+    window.runTest = async () => {
+      clearLog();
+      
+      const testScad = `
+// Test file for GLB export with colors and transparency
+color([1, 0, 0])
+cube([10, 10, 10]);
+
+translate([15, 0, 0])
+color([0, 1, 0], alpha=0.5)
+sphere(r=8);
+
+translate([30, 0, 0])
+color([0, 0, 1], alpha=0.3)
+cylinder(h=20, r=5, center=true);
+
+translate([0, 15, 0])
+color([1, 1, 0])
+cube([8, 8, 8]);
+
+translate([15, 15, 0])
+color([1, 0, 1], alpha=0.7)
+cylinder(h=15, r=6, center=true);
+`;
+
+      try {
+        log("[*] Initializing OpenSCAD WASM...", 'info');
+        const instance = await OpenScad({ noInitialRun: true });
+        addFonts(instance);
+
+        log("[*] Writing test file to virtual FS...", 'info');
+        instance.FS.writeFile("/test.scad", testScad);
+
+        log("[*] Running OpenSCAD to generate GLB...", 'info');
+        const code = instance.callMain(["/test.scad", "--export-format=glb", "-o", "/test.glb"]);
+
+        log(`[*] OpenSCAD exit code: ${code}`, code === 0 ? 'success' : 'error');
+
+        if (code === 0) {
+          try {
+            log("[*] Reading GLB output from virtual FS...", 'info');
+            const output = instance.FS.readFile("/test.glb");
+            const size = output.length;
+            log(`[✓] GLB generated successfully! Size: ${size} bytes`, 'success');
+
+            // Validate GLB header
+            const view = new Uint8Array(output);
+            const magic = String.fromCharCode(view[0], view[1], view[2], view[3]);
+            log(`[*] GLB Magic header: "${magic}" (expected: "glTF")`, magic === 'glTF' ? 'success' : 'error');
+
+            // Download
+            const blob = new Blob([output], { type: "application/octet-stream" });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = "test-colors.glb";
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            
+            log("[✓] File downloaded as test-colors.glb", 'success');
+          } catch (e) {
+            log(`[!] Failed to export GLB: ${e.message}`, 'error');
+          }
+        } else {
+          log(`[!] OpenSCAD compilation failed with code ${code}`, 'error');
+        }
+      } catch (error) {
+        log(`[!] Error: ${error.message}`, 'error');
+        console.error(error);
+      }
+    };
+
+    log("[*] Test page loaded. Click 'Generate GLB with Colors' to start.", 'info');
+  </script>
+</body>
+</html>

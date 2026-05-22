@@ -42,13 +42,19 @@ async function OpenSCAD(options?: InitOptions): Promise<OpenSCAD> {
     ...options,
   };
 
-  globalThis.OpenSCAD = module;
-  await import(wasmModule + `#${Math.random()}`);
-  delete globalThis.OpenSCAD;
-
-  await new Promise((resolve) => {
-    module.onRuntimeInitialized = () => resolve(null);
+  const runtimeReady = new Promise<void>((resolve, reject) => {
+    module.onRuntimeInitialized = () => resolve();
+    (module as { onAbort?: (what: unknown) => void }).onAbort = (what: unknown) => {
+      reject(new Error(`OpenSCAD runtime aborted: ${String(what)}`));
+    };
   });
+
+  const imported = await import(wasmModule + `#${Math.random()}`) as {
+    default: (moduleArg: Partial<OpenSCAD>) => Promise<unknown>;
+  };
+  await imported.default(module);
+
+  await runtimeReady;
 
   return module as unknown as OpenSCAD;
 }
