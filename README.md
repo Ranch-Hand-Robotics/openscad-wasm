@@ -65,6 +65,49 @@ deno test --allow-read --allow-write
 make test
 ```
 
+## GitHub Release Collateral (no npm)
+
+If you want to consume OpenSCAD WASM from another repo (e.g. `babylon_ros`) without publishing to npm,
+you can package and upload the runtime collateral directly to a GitHub Release.
+
+Build artifacts first:
+
+```
+make wasm
+```
+
+Create a release collateral bundle (zip + sha256):
+
+```
+make release-collateral TAG=v1.0.0
+```
+
+Create/upload to GitHub Release (requires `gh auth login`):
+
+```
+make upload-release-collateral TAG=v1.0.0
+```
+
+If your release target is not the `origin` remote, specify it explicitly:
+
+```
+make upload-release-collateral TAG=v1.0.0 REPO=owner/repo
+```
+
+Assets generated/uploaded:
+
+- `openscad-wasm-collateral-<TAG>.zip`
+- `openscad-wasm-collateral-<TAG>.sha256`
+
+Bundle includes:
+
+- `openscad.js`
+- `openscad.wasm.js`
+- `openscad.wasm`
+- `openscad.fonts.js`
+- `openscad.mcad.js`
+- `*.d.ts` declaration files
+
 ## API
 
 The project is an ES6 module. Simply import the module:

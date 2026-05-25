@@ -16,3 +16,4 @@ deno-included-*.txt
 included-test-*.txt
 *.log
 boost-1.87.0-b2-nodocs.tar.xz
+.release/

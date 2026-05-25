@@ -2,9 +2,9 @@
   "include": ["src"],
   "exclude": ["dist"],
   "compilerOptions": {
-    "module": "esnext",
+    "module": "node16",
     "target": "esnext",
-    "moduleResolution": "node",
+    "moduleResolution": "node16",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,

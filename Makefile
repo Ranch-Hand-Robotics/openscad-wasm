@@ -74,6 +74,14 @@ example:
 cli:
 	deno run --allow-read --allow-write --allow-env --allow-net cli-init.ts $(ARGS)
 
+.PHONY: release-collateral
+release-collateral:
+	powershell -ExecutionPolicy Bypass -File scripts\release-collateral.ps1 -Tag $(TAG) $(if $(REPO),-Repo $(REPO),)
+
+.PHONY: upload-release-collateral
+upload-release-collateral:
+	powershell -ExecutionPolicy Bypass -File scripts\release-collateral.ps1 -Tag $(TAG) $(if $(REPO),-Repo $(REPO),) -CreateRelease -Upload
+
 .PHONY: build
 build: build/openscad.wasm.js build/openscad.fonts.js
 
