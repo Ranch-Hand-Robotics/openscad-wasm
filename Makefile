@@ -268,7 +268,7 @@ else
 endif
 
 libs/gmp:
-	wget https://gmplib.org/download/gmp/gmp-6.3.0.tar.xz
+	wget https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz
 ifeq ($(OS),Windows_NT)
 	"C:/Program Files/7-Zip/7z.exe" x gmp-6.3.0.tar.xz
 	"C:/Program Files/7-Zip/7z.exe" x gmp-6.3.0.tar -olibs
@@ -281,7 +281,7 @@ else
 endif
 
 libs/mpfr:
-	wget https://www.mpfr.org/mpfr-4.2.1/mpfr-4.2.1.tar.xz
+	wget https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.1.tar.xz
 ifeq ($(OS),Windows_NT)
 	"C:/Program Files/7-Zip/7z.exe" x mpfr-4.2.1.tar.xz
 	"C:/Program Files/7-Zip/7z.exe" x mpfr-4.2.1.tar -olibs
