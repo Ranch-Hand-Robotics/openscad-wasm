@@ -43,8 +43,16 @@ ifeq ($(OS),Windows_NT)
 	ifeq ($(UNAME_MACHINE),ARM64)
 		UNAME_MACHINE := arm64
 	endif
+	TOUCH := type nul >>
+	MKDIR_BUILD := if not exist build mkdir build
+	MKDIR_LIBS := if not exist libs mkdir libs
+	MKDIR_RES_NOTO := if not exist res\noto mkdir res\noto
 else
 	UNAME_MACHINE := $(shell uname -m)
+	TOUCH := touch
+	MKDIR_BUILD := mkdir -p build
+	MKDIR_LIBS := mkdir -p libs
+	MKDIR_RES_NOTO := mkdir -p res/noto
 endif
 ifeq ($(UNAME_MACHINE),arm64)
     EMSCRIPTEN_SDK_TAG=emscripten/emsdk:$(EMSCRIPTEN_VERSION)-arm64
@@ -86,16 +94,21 @@ upload-release-collateral:
 build: build/openscad.wasm.js build/openscad.fonts.js
 
 build/openscad.fonts.js: runtime/node_modules runtime/**/* res
-	if not exist build mkdir build
+	$(MKDIR_BUILD)
 	cd runtime && npm run build
+ifeq ($(OS),Windows_NT)
 	copy /Y runtime\dist\*.js build\ > nul
 	copy /Y runtime\dist\*.d.ts build\ > nul
+else
+	cp runtime/dist/*.js build/
+	cp runtime/dist/*.d.ts build/
+endif
 
 runtime/node_modules:
 	cd runtime && npm install
 
 build/openscad.wasm.js: .image$(VARIANT)-$(ENV).make
-	if not exist build mkdir build
+	$(MKDIR_BUILD)
 	docker rm -f tmpcpy
 	docker run --name tmpcpy $(DOCKER_TAG_OPENSCAD)
 	docker cp tmpcpy:/home/build/openscad.js build/openscad.wasm.js || docker cp tmpcpy:/home/ubuntu/build/openscad.js build/openscad.wasm.js
@@ -129,7 +142,7 @@ else
 		--build-arg "EMSCRIPTEN_SDK_TAG=$(EMSCRIPTEN_SDK_TAG)" \
 		--output=type=oci,tar=false,dest="$(DOCKER_OCI_BASE)"
 endif
-	type nul >> $@
+	$(TOUCH) $@
 
 #
 #  Using the base image for building the OpenSCAD WASM binary.
@@ -156,7 +169,7 @@ else
 		--build-arg "DOCKER_TAG_BASE=$(DOCKER_TAG_BASE)" \
 		--build-arg "EMSCRIPTEN_FLAGS=$(EMSCRIPTEN_FLAGS)"
 endif
-	type nul >> $@
+	$(TOUCH) $@
 
 libs: \
 	libs/cairo \
@@ -185,8 +198,8 @@ SINGLE_BRANCH=--branch master --single-branch
 SHALLOW=--depth 1
 
 libs/emscripten-crossfile.meson:
-	if not exist libs mkdir libs
-	powershell -Command "Copy-Item emscripten-crossfile.meson libs/emscripten-crossfile.meson"
+	$(MKDIR_LIBS)
+	cp emscripten-crossfile.meson libs/emscripten-crossfile.meson
 
 libs/cairo:
 	git -c core.autocrlf=false clone --recurse https://gitlab.freedesktop.org/cairo/cairo.git ${SHALLOW} ${SINGLE_BRANCH} $@
@@ -241,25 +254,44 @@ libs/openscad:
 
 libs/boost:
 	wget https://github.com/boostorg/boost/releases/download/boost-1.87.0/boost-1.87.0-b2-nodocs.tar.xz
+ifeq ($(OS),Windows_NT)
 	"C:/Program Files/7-Zip/7z.exe" x boost-1.87.0-b2-nodocs.tar.xz
 	"C:/Program Files/7-Zip/7z.exe" x boost-1.87.0-b2-nodocs.tar -olibs
 	del boost-1.87.0-b2-nodocs.tar.xz boost-1.87.0-b2-nodocs.tar
 	move libs\boost-1.87.0 $@
 	powershell -Command "(Get-Content libs/boost/tools/build/src/tools/emscripten.jam) -replace '-fwasm-exceptions','-fexceptions' | Set-Content libs/boost/tools/build/src/tools/emscripten.jam"
+else
+	tar -xJf boost-1.87.0-b2-nodocs.tar.xz -C libs
+	rm boost-1.87.0-b2-nodocs.tar.xz
+	mv libs/boost-1.87.0 $@
+	sed -i 's/-fwasm-exceptions/-fexceptions/' libs/boost/tools/build/src/tools/emscripten.jam
+endif
 
 libs/gmp:
 	wget https://gmplib.org/download/gmp/gmp-6.3.0.tar.xz
+ifeq ($(OS),Windows_NT)
 	"C:/Program Files/7-Zip/7z.exe" x gmp-6.3.0.tar.xz
 	"C:/Program Files/7-Zip/7z.exe" x gmp-6.3.0.tar -olibs
 	del gmp-6.3.0.tar.xz gmp-6.3.0.tar
 	move libs\gmp-6.3.0 $@
+else
+	tar -xJf gmp-6.3.0.tar.xz -C libs
+	rm gmp-6.3.0.tar.xz
+	mv libs/gmp-6.3.0 $@
+endif
 
 libs/mpfr:
 	wget https://www.mpfr.org/mpfr-4.2.1/mpfr-4.2.1.tar.xz
+ifeq ($(OS),Windows_NT)
 	"C:/Program Files/7-Zip/7z.exe" x mpfr-4.2.1.tar.xz
 	"C:/Program Files/7-Zip/7z.exe" x mpfr-4.2.1.tar -olibs
 	del mpfr-4.2.1.tar.xz mpfr-4.2.1.tar
 	move libs\mpfr-4.2.1 $@
+else
+	tar -xJf mpfr-4.2.1.tar.xz -C libs
+	rm mpfr-4.2.1.tar.xz
+	mv libs/mpfr-4.2.1 $@
+endif
 
 res: \
 	res/noto \
@@ -270,7 +302,7 @@ res/liberation:
 	git -c core.autocrlf=false clone --recurse https://github.com/shantigilbert/liberation-fonts-ttf.git ${SHALLOW} ${SINGLE_BRANCH} $@
 
 res/noto:
-	if not exist res\noto mkdir res\noto
+	$(MKDIR_RES_NOTO)
 	wget https://github.com/openmaptiles/fonts/raw/master/noto-sans/NotoSans-Regular.ttf -O res/noto/NotoSans-Regular.ttf
 	wget https://github.com/openmaptiles/fonts/raw/master/noto-sans/NotoNaskhArabic-Regular.ttf -O res/noto/NotoNaskhArabic-Regular.ttf
 
